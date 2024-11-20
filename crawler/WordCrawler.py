@@ -10,7 +10,7 @@ class WordCralwer :
     
     def __init__(self) :
         self.headers = HttpConstant.headers
-        self.dataSource = HttpConstant.dataSource
+        self.dataSource = HttpConstant.wordDataSource
 
     def getWords(self) :
         wordData = requests.get(self.dataSource, headers=self.headers)

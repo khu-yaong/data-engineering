@@ -1,3 +1,4 @@
 *.pyc
 *.csv
 crawler/constant.py
+aws/config.py

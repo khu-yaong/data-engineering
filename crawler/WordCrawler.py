@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from dto.WordDTO import Word
 from crawler.constant import HttpConstant
 
-class WordCralwer :
+class WordCrawler :
     
     def __init__(self) :
         self.headers = HttpConstant.headers

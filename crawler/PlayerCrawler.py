@@ -12,6 +12,35 @@ class PlayerCrawler :
         self.headers = PlayerConstant.headers
         self.host = PlayerConstant.host
         self.recordHeaders = PlayerConstant.recordhHeaders
+        self.key_mappings = {
+            ## 기본 정보 ##
+            "팀명" : "team",
+            "등번호" : "no",
+            "선수명" : "name",
+            "포지션" : "position",
+            "생년월일" : "birth",
+            "체격" : "hw",
+            ## 타자 ##
+            "타율" : "avg",
+            "홈런" : "hr",
+            "안타" : "h",
+            "타점" : "rbi",
+            "득점" : "r",
+            "도루" : "sb",
+            "출루율" : "obp",
+            "출루율+장타율" : "ops",
+            ## 투수 ##
+            "평균자책점" : "era",
+            "승리" : "w",
+            "패배" : "l",
+            "세이브" : "sv",
+            "홀드" : "hld",
+            "이닝" : "ip",
+            "삼진" : "so",
+            "피안타" : "ha",
+            "볼넷" : "bb",
+            "이닝당 출루허용률" : "whip"
+        }
 
     def getPlayers(self) :
         for team in self.teams :
@@ -38,19 +67,28 @@ class PlayerCrawler :
                     table = soup.find("table", {"class": "tEx"})
                     if table :
                     #------------------------------ 1. 선수 정보 파싱 ------------------------------#
-                        rows = table.find("tbody").find_all("tr") # tbody의 모든 tr(행) 선택
+                        rows = table.find("tbody").find_all("tr") # tbody의 모든 tr 선택
+                        ths = table.find("thead").find_all("th")  # thead의 모든 th 선택
                         for row in rows:
-                            cols = row.find_all("td")  # td(열) 선택
-                            cols = [col.text.strip() for col in cols]  # 텍스트만 추출하고 공백 제거
+                            player_dict = {}
+                            tds = row.find_all("td")
+                            for i, th in enumerate(ths):
+                                title = th.text.strip()
+                                if title in self.key_mappings :
+                                    player_dict[self.key_mappings[title]] = tds[i].text.strip()
 
                     #---------------------------- 2. 선수 기록 정보 파싱 ----------------------------#
                             nameCol = row.find("td").find_next_sibling() # 두 번째 td (선수명)
                             linkTag = nameCol.find("a")
-                            if linkTag :
-                                self.getPlayerRecords(linkTag, cols)
+                            playerLink = self.host + linkTag["href"]     # 링크 생성
+
+                            if "Futures" not in playerLink :             # 1군 선수 정보만 포함
+                                if linkTag :
+                                    self.getPlayerRecords(playerLink=playerLink, player_dict=player_dict)
 
                     #------------------------------ 3. 선수 정보 추가 ------------------------------#
-                            self.playerList.append(cols)
+                                    print(player_dict)
+                                    self.playerList.append(player_dict)
                     
                     #----------------------------- 4. 파라미터 업데이트 -----------------------------#
                     raw_text = soup.text
@@ -70,38 +108,50 @@ class PlayerCrawler :
                     data["__EVENTVALIDATION"] = eventvalidation
 
 
-    def getPlayerRecords(self, linkTag, cols) :
-        playerLink = self.host + linkTag["href"] # 링크 생성
-
+    def getPlayerRecords(self, playerLink, player_dict) :
         response = requests.get(playerLink, headers=self.recordHeaders)
         if response.status_code == 200:
             detail_soup = BeautifulSoup(response.text, "html.parser")
             
             detail1 = detail_soup.select_one("#contents > div.sub-content > div.player_records > div:nth-child(3) > table")
             if detail1:
-                detail_rows = detail1.find_all("tr")
-                for detail_row in detail_rows:
-                    detail_cols = detail_row.find_all("td")
-                    for col in detail_cols :
-                        cols.append(col.text.strip())
-            
+                detail_rows = detail1.find("tbody").find_all("tr")           # tbody의 모든 tr 선택
+                ths = detail1.find("thead").find_all("th")                   # thead의 모든 th 선택
+                self.extractDataFromTable(detail_rows=detail_rows, player_dict=player_dict, ths=ths)
+
             detail2 = detail_soup.select_one("#contents > div.sub-content > div.player_records > div:nth-child(4) > table")
             if detail2:
                 detail_rows = detail2.find_all("tr")
-                for detail_row in detail_rows:
-                    detail_cols = detail_row.find_all("td")
-                    for col in detail_cols :
-                        cols.append(col.text.strip())
+                ths = detail2.find("thead").find_all("th")
+                self.extractDataFromTable(detail_rows=detail_rows, player_dict=player_dict, ths=ths)
+                        
+
+    def extractDataFromTable(self, detail_rows, player_dict, ths) :
+        for detail_row in detail_rows:
+            tds = detail_row.find_all("td")
+            for i, th in enumerate(ths):
+                a = th.find("a")
+                if a :
+                    title = a.get("title")
+                    if title :
+                        if title in self.key_mappings and i < len(tds) :
+                            player_dict[self.key_mappings[title]] = tds[i].text.strip()
+
 
     def saveToCsv(self) :
+
         filename = "./csv/player_info.csv"
+
+        all_fields = set()
+        for player in self.playerList:
+            all_fields.update(player.keys())
+        all_fields = sorted(all_fields)
+
         with open(filename, mode="w", encoding="utf-8", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["등번호", "선수명", "팀명", "포지션", "생년월일", "체격", "출신교", \
-                            '팀명', 'AVG/ERA', 'G/G', 'PA/CG', 'AB/SHO', 'R/W', 'H/L', '2B/SV', \
-                            '3B/HLD', 'HR/WPCT', 'TB/TBF', 'RBI/NP', 'SB/IP', 'CS/H', 'SAC/2B', \
-                            'SF/3B', 'BB/HR', 'IBB/SAC', 'HBP/SF', 'SO/BB', 'GDP/IBB', 'SLG/SO', \
-                            'OBP/WP', 'E/BK', 'SB%/R', 'MH/ER', 'OPS/BSV', 'RISP/WHIP', 'PH-BA/AVG', '/QS'])
-            writer.writerows(self.playerList)
+            writer = csv.DictWriter(file, fieldnames=all_fields)
+            writer.writeheader()
+            for player in self.playerList :
+                row = {field: player.get(field, None) for field in all_fields}
+                writer.writerow(player)
 
 

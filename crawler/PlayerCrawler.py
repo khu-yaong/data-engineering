@@ -151,7 +151,6 @@ class PlayerCrawler :
             writer = csv.DictWriter(file, fieldnames=all_fields)
             writer.writeheader()
             for player in self.playerList :
-                row = {field: player.get(field, None) for field in all_fields}
                 writer.writerow(player)
 
 

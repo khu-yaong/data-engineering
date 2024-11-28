@@ -2,3 +2,5 @@
 *.csv
 crawler/constant.py
 aws/config.py
+yaong
+google/client_secret.json

@@ -9,7 +9,7 @@ s3_client = boto3.client('s3')
 def handler(event, context):
 
     # 입력 데이터 처리
-    body = json.loads(event["body"])
+    body = event["body"]
     video_ids = body["videoIds"]
     member_id = body["memberId"]
 
@@ -45,24 +45,24 @@ def handler(event, context):
     final_video_indices = list(set(final_video_indices))[:100]
     videos = video_df.iloc[final_video_indices][["videoId", "title", "team", "thumbnail"]]
 
-    # S3에 csv 파일로 업로드
+    # 추천된 영상 제목을 JSON 형태로 반환
+    prediction = json.dumps({"recommendedVideos": videos.to_dict(orient="records")})
+
+    # S3에 json 파일로 업로드
     try:
         csv_buffer = io.StringIO()
         videos.to_csv(csv_buffer, index=False)
         
         s3_bucket = "yaong-baseball" 
-        s3_key = f"videos/videos_for_member{member_id}.csv"
-        s3_client.put_object(Bucket=s3_bucket, Key=s3_key, Body=csv_buffer.getvalue())
+        s3_key = f"videos/videos_for_member{member_id}.json"
+        s3_client.put_object(Bucket=s3_bucket, Key=s3_key, Body=prediction)
 
     except Exception as e:
         print(f"Error uploading to S3: {e}")
         return {
-            'statusCode': 500,
-            'body': json.dumps({'message': f"Error uploading to S3: {e}"})
+            "statusCode": 500,
+            "body": json.dumps({"message": f"Error uploading to S3: {e}"})
         }
-
-    # 추천된 영상 제목을 JSON 형태로 반환
-    prediction = json.dumps({'recommended_videos': videos.to_dict(orient="records")})
 
     # 결과 반환
     return {

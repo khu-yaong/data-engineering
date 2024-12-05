@@ -9,7 +9,7 @@ s3_client = boto3.client('s3')
 def handler(event, context):
 
     # 입력 데이터 처리
-    body = event["body"]
+    body = json.loads(event["body"])
     video_ids = body["videoIds"]
     member_id = body["memberId"]
 
@@ -35,15 +35,15 @@ def handler(event, context):
         # 유사도에 따라 정렬
         sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
 
-        # 상위 10개 영상 선택
-        sim_scores = sim_scores[1:11]
+        # 상위 100개 영상 선택
+        sim_scores = sim_scores[1:101]
 
         # 선택된 영상의 인덱스
         final_video_indices += [i[0] for i in sim_scores]
 
-    # 선택된 영상의 제목으로 반환
-    final_video_indices = list(set(final_video_indices))[:10]
-    videos = video_df.iloc[final_video_indices][["videoId", "title"]]
+    # 선택된 영상 반환
+    final_video_indices = list(set(final_video_indices))[:100]
+    videos = video_df.iloc[final_video_indices][["videoId", "title", "team", "thumbnail"]]
 
     # S3에 csv 파일로 업로드
     try:

@@ -1,12 +1,17 @@
 import json
 import pandas as pd
+import io
+import boto3
+
+s3_client = boto3.client('s3')
 
 # Lambda 핸들러
 def handler(event, context):
 
     # 입력 데이터 처리
-    body = event['body']
-    video_ids = body['videoIds']
+    body = event["body"]
+    video_ids = body["videoIds"]
+    member_id = body["memberId"]
 
     # 예측 수행
     try:
@@ -38,10 +43,26 @@ def handler(event, context):
 
     # 선택된 영상의 제목으로 반환
     final_video_indices = list(set(final_video_indices))[:10]
-    final_titles = video_df['title'].iloc[final_video_indices].tolist()
+    videos = video_df.iloc[final_video_indices][["videoId", "title"]]
+
+    # S3에 csv 파일로 업로드
+    try:
+        csv_buffer = io.StringIO()
+        videos.to_csv(csv_buffer, index=False)
+        
+        s3_bucket = "yaong-baseball" 
+        s3_key = f"videos/videos_for_member{member_id}.csv"
+        s3_client.put_object(Bucket=s3_bucket, Key=s3_key, Body=csv_buffer.getvalue())
+
+    except Exception as e:
+        print(f"Error uploading to S3: {e}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'message': f"Error uploading to S3: {e}"})
+        }
 
     # 추천된 영상 제목을 JSON 형태로 반환
-    prediction = json.dumps({'recommended_titles': final_titles})
+    prediction = json.dumps({'recommended_videos': videos.to_dict(orient="records")})
 
     # 결과 반환
     return {

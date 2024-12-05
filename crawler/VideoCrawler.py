@@ -32,7 +32,7 @@ class VideoCralwer :
         self.youtube = googleapiclient.discovery.build(
             api_service_name, api_version, credentials=credentials)
 
-    def getVideos(self, playlistId) :
+    def getVideos(self, playlistId, team) :
 
         request = self.youtube.playlistItems().list(
             part="snippet",
@@ -49,12 +49,16 @@ class VideoCralwer :
 
             # items가 있으면 파싱하여 dictionary 저장
             for items in response["items"] :
-                item_dict = {}
-                item_dict["title"] = items["snippet"]["title"]
-                item_dict["description"] = items["snippet"]["description"]
-                item_dict["videoId"] = items["snippet"]["resourceId"]["videoId"]
-                self.videos.append(item_dict)
-                print(item_dict["videoId"])
+                try :
+                    item_dict = {}
+                    item_dict["team"] = team
+                    item_dict["title"] = items["snippet"]["title"]
+                    item_dict["description"] = items["snippet"]["description"]
+                    item_dict["videoId"] = items["snippet"]["resourceId"]["videoId"]
+                    item_dict["thumbnail"] = items["snippet"]["thumbnails"]["high"]["url"]
+                    self.videos.append(item_dict)
+                except :
+                    continue
 
             request = self.youtube.search().list_next(request, response)
 
@@ -62,11 +66,11 @@ class VideoCralwer :
         filename = "./csv/kbo_video.csv"
 
         all_fields = set()
-        for player in self.videos:
-            all_fields.update(player.keys())
+        for video in self.videos:
+            all_fields.update(video.keys())
         all_fields = sorted(all_fields)
 
-        with open(filename, mode="a", encoding="utf-8", newline="") as file:
+        with open(filename, mode="w", encoding="utf-8", newline="") as file:
             writer = csv.DictWriter(file, fieldnames=all_fields)
             writer.writeheader()
             for video in self.videos :
